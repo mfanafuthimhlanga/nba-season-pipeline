@@ -1,2 +1,5 @@
-.venv
-nba/target
+logs/
+dbt/nba/target/
+dbt/nba/logs/
+dbt/nba/dbt_packages/
+.venv/
