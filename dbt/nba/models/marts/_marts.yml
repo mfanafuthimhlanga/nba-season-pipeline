@@ -104,3 +104,155 @@ models:
               arguments:
                 to: ref('dim_team')
                 field: team_id
+
+  - name: mart_daily_leaders
+    description: Top 10 players by game score for each game date.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [game_date, player_id]
+    columns:
+      - name: daily_rank
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 10
+
+  - name: mart_team_form
+    description: One row per team, regular-season record and form over its last 10 games, as of the latest game.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('dim_team')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "wins + losses = games"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "last10_wins + last10_losses = last10_games"
+    columns:
+      - name: team_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: win_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: last10_games
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 10
+      - name: conference_rank
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 15
+
+
+  - name: mart_player_consistency
+    description: One row per player with 10 or more regular-season games played, with scoring averages, spread and season true shooting.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "games_played >= 10"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "stddev_pts >= 0"
+    columns:
+      - name: player_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_player')
+                field: player_id
+      - name: current_team_abbr
+        data_tests: [not_null]
+      - name: season_ts_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1.5
+
+
+  - name: mart_home_away
+    description: One row per team, regular-season home and away record and net rating, and the difference between them.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('dim_team')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_games + away_games = games"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "home_wins <= home_games and away_wins <= away_games"
+    columns:
+      - name: team_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: home_win_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: away_win_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+
+  - name: mart_back_to_back_impact
+    description: One row per team, regular-season performance on the second night of back-to-backs compared with rested games.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('dim_team')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "b2b_games + rested_games = games"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "b2b_wins <= b2b_games and rested_wins <= rested_games"
+    columns:
+      - name: team_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: rested_games
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+      - name: b2b_fg_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
