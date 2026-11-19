@@ -1,0 +1,28 @@
+select
+    game_id,
+    team_id,
+    player_id,
+    player_name,
+    position,
+    starter,
+    did_not_play,
+    ejected,
+    minutes,
+    pts,
+    fgm,
+    fga,
+    fg3m,
+    fg3a,
+    ftm,
+    fta,
+    reb,
+    oreb,
+    dreb,
+    ast,
+    tov,
+    stl,
+    blk,
+    pf,
+    plus_minus
+
+from {{ source('silver', 'player_game_stats') }}

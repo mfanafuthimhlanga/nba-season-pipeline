@@ -1,0 +1,25 @@
+SELECT 
+    game_id,
+    team_id,
+    team_abbr,
+    team_name,
+    is_home,
+    fgm,
+    fga,
+    fg3m,
+    fg3a,
+    ftm,
+    fta, 
+    oreb,
+    dreb,
+    reb,
+    ast,
+    stl,
+    blk,
+    tov,
+    pf,
+    fast_break_pts,
+    paint_pts,
+    pts_off_tov
+
+FROM {{ source('silver', 'team_game_stats') }};
