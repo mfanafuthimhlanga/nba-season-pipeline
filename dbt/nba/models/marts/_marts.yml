@@ -22,3 +22,85 @@ models:
                 values: ['East', 'West']
       - name: division
         data_tests: [not_null]
+  
+  - name: fct_team_game
+    description: One row per team per completed game, with possessions, ratings, pace, result and rest days.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [game_id, team_id]
+    columns:
+      - name: team_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: opponent_team_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: possessions
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 70
+                max_value: 130
+      - name: won
+        data_tests: [not_null]
+
+  - name: fct_player_game
+    description: One row per player per completed game, DNP rows included, with true shooting % and game score.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [game_id, player_id]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "game_score is not null"
+          config:
+            where: "not did_not_play"
+    columns:
+      - name: player_id
+        data_tests: [not_null]
+      - name: team_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: opponent_team_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: did_not_play
+        data_tests: [not_null]
+      - name: ts_pct
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1.5
+
+  - name: dim_player
+    description: One row per player, with the latest name, position and team from their most recent game.
+    columns:
+      - name: player_id
+        data_tests: [unique, not_null]
+      - name: player_name
+        data_tests: [not_null]
+      - name: current_team_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id

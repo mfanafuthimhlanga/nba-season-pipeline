@@ -7,6 +7,7 @@ select
     g.season,
     g.season_type,
     g.is_regular_season,
+    g.overtime_periods,
     t.team_abbr,
     o.team_abbr as opponent_abbr,
     t.is_home,

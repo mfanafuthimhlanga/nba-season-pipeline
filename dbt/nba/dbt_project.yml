@@ -43,4 +43,4 @@ models:
 
 seeds:
   nba:
-    +schema: gold
+    +schema: staging
