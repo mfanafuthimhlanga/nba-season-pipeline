@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: dim_team
+    description: One row per team, with the latest name and abbreviation plus conference and division from the team_conferences seed.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('team_conferences')
+    columns:
+      - name: team_id
+        data_tests: [unique, not_null]
+      - name: team_abbr
+        data_tests: [unique, not_null]
+      - name: team_name
+        data_tests: [not_null]
+      - name: conference
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['East', 'West']
+      - name: division
+        data_tests: [not_null]
