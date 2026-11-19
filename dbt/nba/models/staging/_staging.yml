@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: stg_games
+    columns:
+      - name: game_id
+        data_tests: [unique, not_null]
+      - name: game_date
+        data_tests: [not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              values: ['STATUS_FINAL', 'STATUS_POSTPONED', 'STATUS_CANCELED']
+
+  - name: stg_team_game_stats
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, team_id]
+    columns:
+      - name: game_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_games')
+              field: game_id
+      - name: team_id
+        data_tests: [not_null]
+
+  - name: stg_player_game_stats
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [game_id, player_id]
+    columns:
+      - name: game_id
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('stg_games')
+              field: game_id
+      - name: player_id
+        data_tests: [not_null]
+      - name: did_not_play
+        data_tests: [not_null]
