@@ -1,0 +1,32 @@
+# Checks every push and pull request. A push to main is also a deploy (the
+# nba_daily job reads main whatever CI says), so run this on a branch and merge
+# only when it is green. It reports; it does not block unless branch protection
+# requires it.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install
+        run: |
+          uv venv --python 3.12
+          uv pip install -r requirements.txt
+      - name: Unit tests (config, ESPN client, ingest)
+        run: .venv/bin/python -m pytest -q
+      - name: Python syntax (job notebooks and Spark modules)
+        run: .venv/bin/python -m compileall -q src
+      - name: dbt parse (models, YAML and tests compile; no warehouse needed)
+        working-directory: dbt/nba
+        env:
+          DBT_PROFILES_DIR: ${{ github.workspace }}/.github/ci-profile
+        run: |
+          ../../.venv/bin/dbt deps
+          ../../.venv/bin/dbt parse --no-version-check
+          test "$(../../.venv/bin/dbt ls -q --resource-type test | wc -l)" -ge 89

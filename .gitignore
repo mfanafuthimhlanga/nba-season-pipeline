@@ -3,3 +3,6 @@ dbt/nba/target/
 dbt/nba/logs/
 dbt/nba/dbt_packages/
 .venv/
+.pytest_cache/
+__pycache__/
+.github/ci-profile/.user.yml

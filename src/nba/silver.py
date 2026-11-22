@@ -118,14 +118,24 @@ def _to_int(c: Column) -> Column:
     return F.when(c.rlike(r"^[+-]?\d+$"), c.cast("int"))
 
 
+def _first(arr: Column) -> Column:
+    """arr[0], or null when the array is empty or null.
+
+    Plain arr[0] raises INVALID_ARRAY_INDEX under ANSI mode if ESPN ever sends
+    an empty list. A null instead flows on, and the dbt not_null tests on
+    silver's keys and scores catch it with a clear message.
+    """
+    return F.get(arr, 0)
+
+
 def _made(c: Column) -> Column:
     """'12-19' -> 12"""
-    return _to_int(F.split(c, "-")[0])
+    return _to_int(F.get(F.split(c, "-"), 0))
 
 
 def _att(c: Column) -> Column:
-    """'12-19' -> 19"""
-    return _to_int(F.split(c, "-")[1])
+    """'12-19' -> 19; '' or '--' -> null"""
+    return _to_int(F.get(F.split(c, "-"), 1))
 
 
 FG = "fieldGoalsMade-fieldGoalsAttempted"
@@ -145,9 +155,9 @@ def build_games(scoreboard: DataFrame) -> DataFrame:
     events = df.select("game_date", F.explode("j.events").alias("e"))
 
     # Home and away competitor structs, picked by a higher-order filter.
-    competitors = F.col("e.competitions")[0]["competitors"]
-    home = F.filter(competitors, lambda c: c["homeAway"] == "home")[0]
-    away = F.filter(competitors, lambda c: c["homeAway"] == "away")[0]
+    competitors = _first(F.col("e.competitions"))["competitors"]
+    home = _first(F.filter(competitors, lambda c: c["homeAway"] == "home"))
+    away = _first(F.filter(competitors, lambda c: c["homeAway"] == "away"))
 
     return events.select(
         F.col("e.id").alias("game_id"),
@@ -214,7 +224,7 @@ def build_player_stats(summary: DataFrame) -> DataFrame:
           .select(
               "game_id",
               F.col("p.team.id").alias("team_id"),
-              F.col("p.statistics")[0].alias("b"),
+              _first(F.col("p.statistics")).alias("b"),
           )
     )
 
@@ -263,18 +273,41 @@ def build_player_stats(summary: DataFrame) -> DataFrame:
 # MERGE
 # =============================================================================
 
-def _merge(df: DataFrame, table: str, keys: list[str]) -> None:
-    """Upsert df into table on keys. Rerunning a date updates rows, never duplicates."""
-    # MERGE fails if two source rows match the same target row.
+def _merge(df: DataFrame, table: str, keys: list[str], scope: str, update_if: str | None = None) -> None:
+    """Make `table` match `df` for one game date. Rerunning a date never duplicates.
+
+    - rows in df: inserted, or updated in place on `keys` (only where `update_if`
+      holds, when given)
+    - rows in table inside `scope` that df no longer has: deleted, so a game
+      ESPN stops listing for this date does not linger. `scope` must cover only
+      this date's rows, or the rest of the season would be deleted.
+    """
+    # MERGE fails if two source rows match the same target row. Within one
+    # date's payloads a key can only repeat if ESPN lists something twice, and
+    # then both rows came from the same response, so either one will do.
     df = df.dropDuplicates(keys)
 
     on = " AND ".join(f"t.{k} = s.{k}" for k in keys)  # e.g. "t.game_id = s.game_id"
 
     (DeltaTable.forName(_spark(), table).alias("t")
         .merge(df.alias("s"), on)
-        .whenMatchedUpdateAll()
+        .whenMatchedUpdateAll(condition=update_if)
         .whenNotMatchedInsertAll()
+        .whenNotMatchedBySourceDelete(condition=scope)
         .execute())
+
+
+def _game_ids(game_date: date) -> set[str]:
+    rows = _spark().table(GAMES_TABLE).filter(F.col("game_date") == F.lit(game_date)).select("game_id").collect()
+    return {r.game_id for r in rows}
+
+
+def _in(ids: set[str]) -> str:
+    """SQL scope for a set of numeric game ids (ingest guarantees they are digits)."""
+    if not ids:
+        return "false"
+    assert all(i.isdigit() for i in ids), ids
+    return "t.game_id IN (" + ", ".join(f"'{i}'" for i in sorted(ids)) + ")"
 
 
 # =============================================================================
@@ -292,9 +325,18 @@ def run(game_date: date) -> dict:
     teams = build_team_stats(summary)
     players = build_player_stats(summary)
 
-    _merge(games, GAMES_TABLE, ["game_id"])
-    _merge(teams, TEAM_TABLE, ["game_id", "team_id"])
-    _merge(players, PLAYER_TABLE, ["game_id", "player_id"])
+    # Games this date had before and after the merge. Their stats rows are
+    # replaced as a set. A game that moved to another date and is already final
+    # there is not pulled back: a final row is never overwritten by a
+    # non-final listing (e.g. the old date still saying "postponed").
+    before = _game_ids(game_date)
+    _merge(games, GAMES_TABLE, ["game_id"],
+           scope=f"t.game_date = '{game_date.isoformat()}'",
+           update_if="s.completed OR NOT coalesce(t.completed, false)")
+    day_games = before | _game_ids(game_date)
+
+    _merge(teams, TEAM_TABLE, ["game_id", "team_id"], scope=_in(day_games))
+    _merge(players, PLAYER_TABLE, ["game_id", "player_id"], scope=_in(day_games))
 
     result = {
         "game_date": game_date.isoformat(),

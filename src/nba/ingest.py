@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from datetime import date
 
 from nba import config, espn
@@ -12,6 +13,9 @@ class GamesNotFinalError(RuntimeError):
 
     The job task retries on this, so a late-finishing game is picked up later.
     """
+
+
+_GAME_ID = re.compile(r"^\d+$")  # bronze reads game_id back from "<game_id>.json"
 
 
 def _status(event: dict) -> str:
@@ -47,19 +51,25 @@ def run(game_date: date) -> dict:
     if not_final:
         raise GamesNotFinalError(f"{game_date}: {len(not_final)} game(s) not final: {not_final}")
 
+    bad_ids = [e["id"] for e in expected if not _GAME_ID.match(str(e["id"]))]
+    if bad_ids:
+        raise ValueError(f"{game_date}: game ids are not numeric, bronze could not read them back: {bad_ids}")
+
     # 4. Fetch every summary into memory first, so a failed fetch writes nothing
     summaries = {e["id"]: espn.get_summary(e["id"]) for e in expected}
 
-    # 5. Replace this date's folders, then write
+    # 5. Replace this date's folders. The scoreboard folder is emptied first and
+    #    scoreboard.json is written last, so it marks a complete date: a crash
+    #    part-way leaves no scoreboard.json and bronze refuses the date.
     partition = config.date_partition(game_date)
     scoreboard_dir = os.path.join(config.SCOREBOARD_DIR, partition)
     summary_dir = os.path.join(config.SUMMARY_DIR, partition)
     _reset_dir(scoreboard_dir)
     _reset_dir(summary_dir)
 
-    _write_json(os.path.join(scoreboard_dir, "scoreboard.json"), scoreboard)
     for game_id, summary in summaries.items():
         _write_json(os.path.join(summary_dir, f"{game_id}.json"), summary)
+    _write_json(os.path.join(scoreboard_dir, config.SCOREBOARD_FILE), scoreboard)
 
     # 6. Report
     result = {

@@ -22,4 +22,4 @@ SELECT
     paint_pts,
     pts_off_tov
 
-FROM {{ source('silver', 'team_game_stats') }};
+FROM {{ source('silver', 'team_game_stats') }}
