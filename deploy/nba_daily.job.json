@@ -22,7 +22,7 @@
       "environment_key": "dbt-default",
       "spec": {
         "dependencies": [
-          "dbt-databricks>=1.0.0,<2.0.0"
+          "dbt-databricks==1.13.0"
         ],
         "environment_version": "6"
       }
@@ -69,7 +69,7 @@
       "retry_on_timeout": false,
       "run_if": "ALL_SUCCESS",
       "task_key": "ingest_raw",
-      "timeout_seconds": 0,
+      "timeout_seconds": 1800,
       "webhook_notifications": {}
     },
     {
@@ -90,7 +90,7 @@
       "retry_on_timeout": false,
       "run_if": "ALL_SUCCESS",
       "task_key": "load_bronze",
-      "timeout_seconds": 0,
+      "timeout_seconds": 1800,
       "webhook_notifications": {}
     },
     {
@@ -111,7 +111,7 @@
       "retry_on_timeout": false,
       "run_if": "ALL_SUCCESS",
       "task_key": "build_silver",
-      "timeout_seconds": 0,
+      "timeout_seconds": 1800,
       "webhook_notifications": {}
     },
     {
@@ -140,10 +140,10 @@
       "retry_on_timeout": false,
       "run_if": "ALL_SUCCESS",
       "task_key": "dbt_build",
-      "timeout_seconds": 0,
+      "timeout_seconds": 1800,
       "webhook_notifications": {}
     }
   ],
-  "timeout_seconds": 0,
+  "timeout_seconds": 7200,
   "webhook_notifications": {}
 }
