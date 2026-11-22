@@ -1,5 +1,7 @@
 # Checks every push and pull request. A push to main is also a deploy (the
-# nba_daily job reads main), so this is the last gate before production.
+# nba_daily job reads main whatever CI says), so run this on a branch and merge
+# only when it is green. It reports; it does not block unless branch protection
+# requires it.
 name: ci
 
 on:
