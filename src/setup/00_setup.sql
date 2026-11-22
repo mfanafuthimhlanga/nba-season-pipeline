@@ -1,3 +1,21 @@
+-- One-time setup for a new workspace. Safe to rerun: everything is IF NOT EXISTS.
+-- Run it in a SQL editor or notebook before the first job run.
+--
+-- Creates what the Python jobs cannot create for themselves:
+--   catalog nba, schemas raw / bronze / silver, the landing volume, and the
+--   silver tables (MERGE needs an existing target).
+-- Bronze tables are created by the first load (saveAsTable). dbt creates the
+-- staging, intermediate and gold schemas itself.
+--
+-- If CREATE CATALOG is refused (Databricks Free Edition), use the existing
+-- "workspace" catalog instead and change the names listed in src/nba/config.py.
+
+CREATE CATALOG IF NOT EXISTS nba;
+CREATE SCHEMA IF NOT EXISTS nba.raw;
+CREATE SCHEMA IF NOT EXISTS nba.bronze;
+CREATE SCHEMA IF NOT EXISTS nba.silver;
+CREATE VOLUME IF NOT EXISTS nba.raw.landing;
+
 -- declare silver tables so merge has a target
 
 CREATE TABLE IF NOT EXISTS nba.silver.games ( 

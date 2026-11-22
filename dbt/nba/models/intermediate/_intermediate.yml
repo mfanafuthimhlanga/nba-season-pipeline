@@ -5,18 +5,22 @@ models:
     description: One row per team per completed game, with that game's opponent stats side by side.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: [game_id, team_id]
+          arguments:
+            combination_of_columns: [game_id, team_id]
       - dbt_utils.expression_is_true:
-          expression: "team_id <> opponent_team_id"
+          arguments:
+            expression: "team_id <> opponent_team_id"
       - dbt_utils.expression_is_true:
-          expression: "pts <> opp_pts"
+          arguments:
+            expression: "pts <> opp_pts"
     columns:
       - name: game_id
         data_tests:
           - not_null
           - relationships:
-              to: ref('stg_games')
-              field: game_id
+              arguments:
+                to: ref('stg_games')
+                field: game_id
       - name: team_id
         data_tests: [not_null]
       - name: opponent_team_id
@@ -25,7 +29,8 @@ models:
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
-              min_value: 50
-              max_value: 200
+              arguments:
+                min_value: 50
+                max_value: 200
       - name: opp_pts
         data_tests: [not_null]

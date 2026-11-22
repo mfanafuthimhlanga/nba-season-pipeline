@@ -5,11 +5,13 @@
 # MAGIC functions as the daily job. dbt is not run here: run it once afterwards.
 # MAGIC
 # MAGIC Widgets:
-# MAGIC - `start_date`: first date, default the season start
+# MAGIC - `start_date`: first date, blank = the season start (config.SEASON_START)
 # MAGIC - `end_date`: last date, blank = yesterday (US Eastern)
 # MAGIC
-# MAGIC A failed date does not stop the loop. Failures are listed at the end.
-# MAGIC Rerun just those dates by setting both widgets to the same date.
+# MAGIC A failed date does not stop the loop. Failures are listed at the end, and
+# MAGIC then the notebook raises, so a run with any failed date ends red (and a
+# MAGIC job's failure email fires). Rerun just those dates by setting both widgets
+# MAGIC to the same date.
 
 # COMMAND ----------
 
@@ -20,7 +22,7 @@ sys.path.append(os.path.abspath(".."))
 
 # COMMAND ----------
 
-dbutils.widgets.text("start_date", "2026-10-20")
+dbutils.widgets.text("start_date", "")
 dbutils.widgets.text("end_date", "")
 
 # COMMAND ----------
@@ -31,7 +33,7 @@ from datetime import timedelta
 
 from nba import bronze, config, ingest, silver
 
-start = config.resolve_game_date(dbutils.widgets.get("start_date"))
+start = config.resolve_game_date(dbutils.widgets.get("start_date") or config.SEASON_START.isoformat())
 end = config.resolve_game_date(dbutils.widgets.get("end_date"))
 if start > end:
     raise ValueError(f"start_date {start} is after end_date {end}")
@@ -69,3 +71,6 @@ for f in failures:
 
 if results:
     display(spark.createDataFrame(results))
+
+if failures:
+    raise RuntimeError(f"{len(failures)} of {len(dates)} dates failed: {[f[0] for f in failures]}")

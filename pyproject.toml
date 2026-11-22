@@ -1,0 +1,4 @@
+# Tooling config only. The pipeline itself runs as Databricks notebooks.
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

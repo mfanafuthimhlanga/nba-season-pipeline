@@ -19,17 +19,13 @@ def _spark() -> SparkSession:
 
 def _read_folder(path: str, game_date: date) -> DataFrame:
     """Read every file in `path` as ONE row each, with audit columns."""
-    spark = _spark()
-
-    df = spark.read.text(path, wholetext=True)
-
+    df = _spark().read.text(path, wholetext=True)
     return df.select(
-    F.col("value").alias("payload"),
-    F.col("_metadata.file_path").alias("source_file"),
-    F.lit(game_date).alias("game_date"),
-    F.current_timestamp().alias("ingested_at"),
+        F.col("value").alias("payload"),
+        F.col("_metadata.file_path").alias("source_file"),
+        F.lit(game_date).alias("game_date"),
+        F.current_timestamp().alias("ingested_at"),
     )
-        
 
 
 def _replace_date(df: DataFrame, table: str, game_date: date) -> None:
@@ -44,8 +40,9 @@ def run(game_date: date) -> dict:
     scoreboard_dir = os.path.join(config.SCOREBOARD_DIR, partition)
     summary_dir = os.path.join(config.SUMMARY_DIR, partition)
 
-    if not os.path.isdir(scoreboard_dir):
-        raise FileNotFoundError(f"No raw scoreboard for {game_date}. Run ingest first: {scoreboard_dir}")
+    # ingest writes scoreboard.json last, so without it the date is missing or half-written.
+    if not os.path.isfile(os.path.join(scoreboard_dir, config.SCOREBOARD_FILE)):
+        raise FileNotFoundError(f"No complete raw date for {game_date}. Run ingest first: {scoreboard_dir}")
 
     # Scoreboard: always exactly one file per date
     scoreboard = _read_folder(scoreboard_dir, game_date)
@@ -58,9 +55,13 @@ def run(game_date: date) -> dict:
     # Summaries: zero files on days with no games
     summary_files = os.listdir(summary_dir) if os.path.isdir(summary_dir) else []
     if summary_files:
-        summary = _read_folder(summary_dir, game_date)
-
-        summary = summary.withColumn('game_id', F.regexp_extract("source_file", r"(\d+)\.json$", 1))
+        summary = _read_folder(summary_dir, game_date).withColumn(
+            "game_id", F.regexp_extract("source_file", r"(\d+)\.json$", 1)
+        )
+        # regexp_extract returns '' instead of failing when a name does not match.
+        unnamed = summary.filter(F.col("game_id") == "").select("source_file").limit(5).collect()
+        if unnamed:
+            raise ValueError(f"{game_date}: summary files without a numeric game id: {[r.source_file for r in unnamed]}")
 
         _replace_date(
             summary.select("game_id", "game_date", "payload", "source_file", "ingested_at"),

@@ -31,10 +31,4 @@ select
         when completed then greatest(periods - 4, 0)
     end as overtime_periods
 
-from {{ source('silver', 'games') }};
-
-
-
-
-
-
+from {{ source('silver', 'games') }}

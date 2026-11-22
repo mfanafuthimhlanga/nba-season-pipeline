@@ -29,6 +29,10 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [game_id, team_id]
+      # Possessions per 48 minutes, so overtime games are judged on the same scale.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "possessions * 48 / (48 + 5 * overtime_periods) between 70 and 130"
     columns:
       - name: team_id
         data_tests:
@@ -45,12 +49,7 @@ models:
                 to: ref('dim_team')
                 field: team_id
       - name: possessions
-        data_tests:
-          - not_null
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 70
-                max_value: 130
+        data_tests: [not_null]
       - name: won
         data_tests: [not_null]
 
@@ -163,7 +162,7 @@ models:
 
 
   - name: mart_player_consistency
-    description: One row per player with 10 or more regular-season games played, with scoring averages, spread and season true shooting.
+    description: One row per player with 10 or more regular-season games played, with scoring averages, spread and season true shooting. current_team_abbr is the team of the player's latest game, so a traded player's whole season is listed under his current team.
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:

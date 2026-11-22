@@ -4,8 +4,13 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 # --- Unity Catalog -----------------------------------------------------------
-# If CREATE CATALOG was refused on Free Edition, change CATALOG to "workspace"
-# and prefix the schema names (e.g. "nba_bronze"). Nothing else needs to change.
+# Every Python job reads these names. The catalog name "nba" is also written in
+# three places Python cannot reach; change them together:
+#   src/setup/00_setup.sql        (catalog, schemas, volume, silver tables)
+#   dbt/nba/models/schema.yml     (source database)
+#   ~/.dbt/profiles.yml / the job's dbt task  (catalog)
+# If CREATE CATALOG is refused (Databricks Free Edition), use CATALOG =
+# "workspace" and change the same three places.
 CATALOG = "nba"
 BRONZE = f"{CATALOG}.bronze"
 SILVER = f"{CATALOG}.silver"
@@ -14,12 +19,14 @@ SILVER = f"{CATALOG}.silver"
 VOLUME_ROOT = f"/Volumes/{CATALOG}/raw/landing"
 SCOREBOARD_DIR = f"{VOLUME_ROOT}/scoreboard"
 SUMMARY_DIR = f"{VOLUME_ROOT}/summary"
+SCOREBOARD_FILE = "scoreboard.json"  # written LAST: its presence marks a complete date
 
 # --- Source: ESPN (unofficial, undocumented) ----------------------------------
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
 REQUEST_TIMEOUT_S = 15
 REQUEST_PAUSE_S = 0.5   # be polite between calls
-MAX_ATTEMPTS = 3        # for connection errors and 5xx only
+MAX_ATTEMPTS = 3        # for connection errors, 429 and 5xx only
+MAX_RETRY_AFTER_S = 60  # cap on a 429's Retry-After header
 
 # --- Season and status rules --------------------------------------------------
 SEASON_START = date(2026, 10, 20)

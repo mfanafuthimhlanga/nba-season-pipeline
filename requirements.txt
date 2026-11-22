@@ -1,0 +1,11 @@
+# Laptop and CI environment: dbt, tests and the job export script.
+# The jobs themselves run on Databricks serverless, which provides pyspark,
+# delta and requests; nothing here is installed there.
+#
+#   uv venv --python 3.12 && uv pip install -r requirements.txt
+dbt-core==1.12.6
+dbt-databricks==1.13.0
+requests==2.34.2
+databricks-sdk==0.117.0
+PyYAML==6.0.3
+pytest==9.2.0

@@ -1,0 +1,149 @@
+{
+  "email_notifications": {
+    "no_alert_for_skipped_runs": false,
+    "on_failure": [
+      "<owner e-mail>"
+    ],
+    "on_start": [
+      "<owner e-mail>"
+    ],
+    "on_success": [
+      "<owner e-mail>"
+    ]
+  },
+  "environments": [
+    {
+      "environment_key": "Default",
+      "spec": {
+        "environment_version": "6"
+      }
+    },
+    {
+      "environment_key": "dbt-default",
+      "spec": {
+        "dependencies": [
+          "dbt-databricks>=1.0.0,<2.0.0"
+        ],
+        "environment_version": "6"
+      }
+    }
+  ],
+  "format": "MULTI_TASK",
+  "git_source": {
+    "git_branch": "main",
+    "git_provider": "gitHub",
+    "git_url": "https://github.com/mfanafuthimhlanga/nba-season-pipeline"
+  },
+  "max_concurrent_runs": 1,
+  "name": "nba_daily",
+  "notification_settings": {
+    "no_alert_for_canceled_runs": false,
+    "no_alert_for_skipped_runs": false
+  },
+  "parameters": [
+    {
+      "default": "",
+      "name": "game_date"
+    }
+  ],
+  "performance_target": "PERFORMANCE_OPTIMIZED",
+  "queue": {
+    "enabled": true
+  },
+  "schedule": {
+    "pause_status": "UNPAUSED",
+    "quartz_cron_expression": "26 0 11 * * ?",
+    "timezone_id": "Africa/Johannesburg"
+  },
+  "tasks": [
+    {
+      "disable_auto_optimization": false,
+      "disabled": false,
+      "environment_key": "Default",
+      "max_retries": 1,
+      "min_retry_interval_millis": 3600000,
+      "notebook_task": {
+        "notebook_path": "src/jobs/01_ingest_raw",
+        "source": "GIT"
+      },
+      "retry_on_timeout": false,
+      "run_if": "ALL_SUCCESS",
+      "task_key": "ingest_raw",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "ingest_raw"
+        }
+      ],
+      "disable_auto_optimization": true,
+      "disabled": false,
+      "environment_key": "Default",
+      "max_retries": 0,
+      "min_retry_interval_millis": 900000,
+      "notebook_task": {
+        "notebook_path": "src/jobs/02_load_bronze",
+        "source": "GIT"
+      },
+      "retry_on_timeout": false,
+      "run_if": "ALL_SUCCESS",
+      "task_key": "load_bronze",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "load_bronze"
+        }
+      ],
+      "disable_auto_optimization": true,
+      "disabled": false,
+      "environment_key": "Default",
+      "max_retries": 0,
+      "min_retry_interval_millis": 900000,
+      "notebook_task": {
+        "notebook_path": "src/jobs/03_build_silver",
+        "source": "GIT"
+      },
+      "retry_on_timeout": false,
+      "run_if": "ALL_SUCCESS",
+      "task_key": "build_silver",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "dbt_task": {
+        "catalog": "nba",
+        "commands": [
+          "dbt deps",
+          "dbt seed",
+          "dbt build"
+        ],
+        "project_directory": "dbt/nba",
+        "schema": "gold",
+        "source": "GIT",
+        "warehouse_id": "<sql warehouse id>"
+      },
+      "depends_on": [
+        {
+          "task_key": "build_silver"
+        }
+      ],
+      "disable_auto_optimization": true,
+      "disabled": false,
+      "environment_key": "dbt-default",
+      "max_retries": 0,
+      "min_retry_interval_millis": 900000,
+      "retry_on_timeout": false,
+      "run_if": "ALL_SUCCESS",
+      "task_key": "dbt_build",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    }
+  ],
+  "timeout_seconds": 0,
+  "webhook_notifications": {}
+}

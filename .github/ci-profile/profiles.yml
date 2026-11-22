@@ -1,0 +1,12 @@
+# Placeholder connection so `dbt parse` can run in CI. It never connects.
+nba:
+  target: ci
+  outputs:
+    ci:
+      type: databricks
+      host: example.cloud.databricks.com
+      http_path: /sql/1.0/warehouses/ci
+      token: not-a-token
+      catalog: nba
+      schema: gold
+      threads: 1

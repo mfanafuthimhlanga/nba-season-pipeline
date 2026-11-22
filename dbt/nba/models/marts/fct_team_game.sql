@@ -15,7 +15,8 @@ with_rest as (
         *,
         datediff(
             game_date,
-            lag(game_date) over (partition by team_id order by game_date)
+            -- per season: the first game of a season has no previous game, not a 5-month rest
+            lag(game_date) over (partition by team_id, season order by game_date)
         ) as rest_days
     from with_possessions
 )
