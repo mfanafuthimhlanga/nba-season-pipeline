@@ -1,0 +1,35 @@
+version: 2
+
+# Tables written by the Python tasks of the nba_daily job (src/nba). dbt only
+# reads them. The catalog name `nba` is also set in src/nba/config.py.
+
+sources:
+  - name: silver
+    description: Typed tables built by src/nba/silver.py, one game date at a time, MERGEd on their keys.
+    database: nba
+    schema: silver
+    tables:
+      - name: games
+        description: One row per game listed on ESPN's scoreboard for a date (key game_id). Postponed and cancelled games are kept with their status.
+      - name: team_game_stats
+        description: One row per team per game from the game summary's boxscore.teams (key game_id, team_id).
+      - name: player_game_stats
+        description: One row per player per game from the game summary's boxscore.players, DNP rows included (key game_id, player_id).
+
+  - name: bronze
+    description: Raw ESPN JSON loaded by src/nba/bronze.py, one row per file, payload kept as a string.
+    database: nba
+    schema: bronze
+    tables:
+      - name: scoreboard
+        description: >
+          One row per game date: the ESPN scoreboard response. Besides that
+          date's games, every scoreboard carries the season calendar
+          (leagues[0].calendar), which stg_schedule_dates reads.
+        columns:
+          - name: game_date
+            description: US Eastern game day the file was fetched for.
+          - name: payload
+            description: The ESPN response, untouched, as a JSON string.
+          - name: ingested_at
+            description: When bronze loaded the file (UTC).

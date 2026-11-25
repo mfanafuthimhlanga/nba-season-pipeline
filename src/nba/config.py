@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 # Every Python job reads these names. The catalog name "nba" is also written in
 # three places Python cannot reach; change them together:
 #   src/setup/00_setup.sql        (catalog, schemas, volume, silver tables)
-#   dbt/nba/models/schema.yml     (source database)
+#   dbt/nba/models/_sources.yml   (source database)
 #   ~/.dbt/profiles.yml / the job's dbt task  (catalog)
 # If CREATE CATALOG is refused (Databricks Free Edition), use CATALOG =
 # "workspace" and change the same three places.
@@ -29,7 +29,7 @@ MAX_ATTEMPTS = 3        # for connection errors, 429 and 5xx only
 MAX_RETRY_AFTER_S = 60  # cap on a 429's Retry-After header
 
 # --- Season and status rules --------------------------------------------------
-SEASON_START = date(2026, 10, 20)
+SEASON_START = date(2026, 10, 20)  # also var season_start in dbt/nba/dbt_project.yml
 GAME_DAY_TZ = ZoneInfo("America/New_York")  # ESPN "dates" = US Eastern game day
 FINAL_STATUS = "STATUS_FINAL"
 SKIP_STATUSES = frozenset({"STATUS_POSTPONED", "STATUS_CANCELED"})
