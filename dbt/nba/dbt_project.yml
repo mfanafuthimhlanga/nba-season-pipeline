@@ -28,7 +28,21 @@ models:
     marts:
       +schema: gold
       +materialized: table
+      # Write model and column descriptions to Unity Catalog as table and column
+      # comments, so they show in Catalog Explorer and in BI tools.
+      +persist_docs:
+        relation: true
+        columns: true
 
 seeds:
   nba:
     +schema: staging
+
+vars:
+  # First day of the regular season. Same date as SEASON_START in
+  # src/nba/config.py: change both at the start of each season.
+  season_start: '2026-10-20'
+  # Dates ESPN's calendar lists as game days that genuinely had no final game
+  # (every game postponed). tests/assert_scheduled_dates_loaded.sql skips them.
+  # Format: ['YYYY-MM-DD', ...]
+  schedule_exceptions: []

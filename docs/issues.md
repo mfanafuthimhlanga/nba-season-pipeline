@@ -1,11 +1,15 @@
 # Issues register
 
-Found in a review of the whole repository, its dbt logs and the live
-`nba_daily` job on 2026-11-22. Fixed on branch `fix/audit-2026-11-22`.
+Issues 1–28: a review of the whole repository, its dbt logs and the live
+`nba_daily` job on 2026-11-22, fixed on branch `fix/audit-2026-11-22`.
+Issues 29–38: a review of data completeness, dashboard readiness and the
+documentation on 2026-11-24, on branch `feat/freshness-standings-history`
+([below](#2026-11-24-data-completeness-and-documentation)).
 
 Status: **fixed** (code changed and verified) · **fixed in workspace** (needs
 a change to the Databricks job, not this repo) · **accepted** (reviewed, left
-as is on purpose, reason given) · **no action** (not present).
+as is on purpose, reason given) · **no action** (not present) · **open** (not
+fixed yet).
 
 ## How the fixes were verified
 
@@ -70,6 +74,42 @@ as is on purpose, reason given) · **no action** (not present).
 | 26 | `mart_player_consistency` lists a traded player's whole season under his current team. | `_marts.yml` | accepted | By design (the column is `current_team_abbr`); now stated in the model's description. |
 | 27 | A run on 18 Nov created views in `nba.gold_staging` before the schema macro existed; dbt never drops what it stops building. | warehouse | no action | Checked `nba.information_schema` on 2026-11-22: the schema no longer exists. |
 | 28 | `dbt_project.yml` still carried the starter comments about an `example/` folder. | `dbt_project.yml` | fixed | Replaced with a note on the schema naming. |
+
+## 2026-11-24: data completeness and documentation
+
+State at review: 6 successful `nba_daily` runs in a row (19–24 Nov, about 3.5
+minutes each, no retries needed). Bronze shows the 28-date backfill on 18 Nov,
+then exactly one new date per daily run. 34 game dates and 258 games loaded,
+all final; the one calendar gap, 3 Nov, had no games.
+
+### Verification
+
+- `dbt parse` with the CI profile: 15 models, 108 tests, no warnings.
+- `dbt seed` + `dbt build` of the branch on the live warehouse, written to
+  temporary `nba.zz_verify_*` schemas (a copy of the project with a prefixing
+  `generate_schema_name`), reading production silver and bronze only:
+  124 of 124 nodes passed. The schemas were dropped afterwards.
+- `assert_scheduled_dates_loaded` against silver with 22 and 23 Nov removed and
+  22 Nov listed in `schedule_exceptions`: returned exactly 2026-11-23.
+  `dbt ls -s stg_schedule_dates+` lists no other model, so a failure skips no
+  gold model.
+- ESPN's calendar (174 dates) against silver: every calendar date from 20 Oct
+  to 23 Nov is loaded and every loaded date is in the calendar.
+- `persist_docs`: all 179 gold columns and all 10 gold tables carry comments
+  in `information_schema`.
+
+| # | Issue | Where | Status | Resolution |
+|---|---|---|---|---|
+| 29 | The season-level marts (`mart_team_form`, `mart_home_away`, `mart_back_to_back_impact`, `mart_player_consistency`) aggregate every regular-season game in `fct_team_game` / `fct_player_game`, of any season. With one season loaded the numbers are right; on the first night of 2027-28 they would mix two seasons. | `models/marts/` | open | Filter each to the latest season before October 2027. `assert_standings_history_matches_team_form` fails when the second season starts, so this cannot be missed. Listed under "Start of a new season" in `docs/runbook.md`. |
+| 30 | An empty ESPN scoreboard on a game night loads as "no games" and every task succeeds; a date whose run failed and was never rerun also leaves the job green from the next day on. Nothing compared what was loaded with what was scheduled. | `dbt/nba` | fixed | `stg_schedule_dates` reads ESPN's season calendar from the latest scoreboard; `tests/assert_scheduled_dates_loaded.sql` fails for any scheduled date since `season_start` with no final game in silver, and `dbt_utils.at_least_one` fails if the calendar is ever empty. Exceptions go in the var `schedule_exceptions`. |
+| 31 | The dbt profile has one target and schemas are used as named, so a `dbt build` from the laptop writes the production `nba.gold`, `nba.staging` and `nba.intermediate`. There is no dev environment. | `macros/generate_schema_name.sql`, `~/.dbt/profiles.yml` | open | Documented in `dbt/nba/README.md` and `docs/runbook.md`, with the prefixed-copy method used to verify this branch. A `dev` target that prefixes schemas would remove the risk; it touches the macro the job relies on, so it needs its own change. |
+| 32 | The marts only held the current state: no way to chart standings or form over the season. | `models/marts/` | fixed | `mart_standings_history`: one row per team per regular-season game date, rebuilt in full from `fct_team_game`, so backfilled and rerun dates are always included. Its latest date is tested against `mart_team_form`. |
+| 33 | No column in any model had a description; a dashboard author had to read SQL to learn what `net_rtg`, `form_trend` or `pts_cv` mean, and Unity Catalog showed nothing. | `_marts.yml` | fixed | Every gold column described; shared metric definitions as doc blocks in `models/_docs.md`; `persist_docs` writes them to Unity Catalog. |
+| 34 | Sources and the seed had no descriptions, and the sources file was `models/schema.yml`, unlike the `_<folder>.yml` convention of the other YAML files. | `models/`, `seeds/` | fixed | Renamed to `models/_sources.yml` with descriptions; `seeds/_seeds.yml` added with tests (`team_abbr` unique, not null). |
+| 35 | Model and test counts were written in the top README, the dbt README and CI, and go stale whenever a model is added. | docs, CI | fixed | Exact counts only in `dbt/nba/README.md`; the top README no longer has them; CI's minimum is now 108. |
+| 36 | No runbook: what to do for each kind of failure lived only in people's heads and in this register. | `docs/` | fixed | `docs/runbook.md`: per-task failure table, rerunning a date, postponed games, start-of-season steps, how to try a dbt change safely. |
+| 37 | The season start is written in two places, `SEASON_START` in `src/nba/config.py` and the dbt var `season_start`, because dbt cannot read the Python config. | `config.py`, `dbt_project.yml` | accepted | Each comment points to the other, and both are in the runbook's start-of-season steps. |
+| 38 | If the job does not run at all (schedule paused, workspace outage), no task fails and no e-mail is sent; the schedule test runs inside the job, so it cannot catch this. | job `nba_daily` | open | Needs a check outside the job: a Databricks SQL alert on the hours since `max(ingested_at)` in `nba.bronze.scoreboard`, which gains a row on every run, games or not (`max(game_date)` in silver stalls over the All-Star break). Checked at 12:00 UTC, a run that happened is about 3 hours old and a missed one about 27, so alert above 12 hours. A workspace-wide outage would silence the alert too; only a check outside Databricks covers that. Noted in the README's data quality section. |
 
 ## Incidents (already resolved before this review)
 

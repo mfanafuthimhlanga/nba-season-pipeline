@@ -5,7 +5,7 @@ scores → raw JSON → bronze → silver → dbt gold marts.
 
     ESPN site API ──► landing volume ──► bronze ──────► silver ───────► gold (dbt)
     scoreboard +      untouched JSON     one row per    typed tables,   2 dims, 2 facts,
-    one summary       per game date      file, payload  MERGEd on keys  5 marts, 89 tests
+    one summary       per game date      file, payload  MERGEd on keys  6 marts, tested
     per game                             as a string
 
 | Layer | Where | Written by |
@@ -28,6 +28,7 @@ date, so any step can be rerun safely.
     dbt/nba/          dbt project for the gold layer
     deploy/           nba_daily.job.json (the job, exported) and export_job.py
     tests/            unit tests for the parts that run without Spark
+    docs/runbook.md   what to do when a run fails; rerunning a date; new season
     docs/issues.md    known issues and how each was resolved
 
 ## Production: the `nba_daily` job
@@ -77,6 +78,37 @@ with the same functions as the daily job. Widgets: `start_date` (blank = season
 start) and `end_date` (blank = yesterday). A failed date does not stop the loop;
 failures are listed and the notebook then raises, so the run ends red. Rerun a
 single date by setting both widgets to it.
+
+## Data quality
+
+Every `dbt build` (the job's last task) checks the data as well as building it:
+
+- **Every scheduled date is loaded.** `stg_schedule_dates` reads ESPN's season
+  calendar from the latest scoreboard, and
+  `tests/assert_scheduled_dates_loaded.sql` fails if any scheduled date from
+  `season_start` to yesterday has no final game in silver. This catches an
+  empty scoreboard on a game night and a failed date nobody reran, both of
+  which otherwise leave every task green. It ends the run red without
+  stopping gold from building.
+- **Tests on every model** (keys, relationships, ranges, row counts), run right
+  after the model they test; a failure skips everything downstream.
+- **Marts agree with each other.** The latest date of `mart_standings_history`
+  must match `mart_team_form`.
+
+The job e-mails on failure. [docs/runbook.md](docs/runbook.md) lists each
+failure and what to do.
+
+The schedule check cannot tell you the job did not run at all (a paused
+schedule, a workspace outage): then nothing runs and nothing e-mails. The
+job's last run is in the Databricks UI, or `databricks jobs list-runs`.
+
+## Using the data
+
+Point dashboards and queries at `nba.gold` only; `nba.staging` and
+`nba.intermediate` are internal views. Every gold table and column has a
+description, written to Unity Catalog (Catalog Explorer shows it) and listed in
+[dbt/nba/README.md](dbt/nba/README.md#gold-tables). Gold is rebuilt in full on
+every run, after yesterday's games are loaded.
 
 ## Source
 

@@ -1,6 +1,12 @@
 version: 2
 
+# Gold layer: nba.gold. Descriptions are written to Unity Catalog as table and
+# column comments (persist_docs in dbt_project.yml). Shared metric definitions
+# live in models/_docs.md.
+
 models:
+  # --- Dimensions --------------------------------------------------------------
+
   - name: dim_team
     description: One row per team, with the latest name and abbreviation plus conference and division from the team_conferences seed.
     data_tests:
@@ -9,22 +15,50 @@ models:
             compare_model: ref('team_conferences')
     columns:
       - name: team_id
+        description: "{{ doc('team_id') }}"
         data_tests: [unique, not_null]
       - name: team_abbr
+        description: "{{ doc('team_abbr') }}"
         data_tests: [unique, not_null]
       - name: team_name
+        description: Full team name from the team's latest game, e.g. Boston Celtics.
         data_tests: [not_null]
       - name: conference
+        description: "{{ doc('conference') }}"
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['East', 'West']
       - name: division
+        description: "{{ doc('division') }}"
         data_tests: [not_null]
-  
+
+  - name: dim_player
+    description: One row per player who has appeared in a box score, with the latest name, position and team from their most recent game.
+    columns:
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+        data_tests: [unique, not_null]
+      - name: player_name
+        description: Player's display name from their latest game.
+        data_tests: [not_null]
+      - name: position
+        description: Position from their latest game (G, F or C).
+      - name: current_team_id
+        description: Team of the player's latest game. A traded player moves with his latest game.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: last_game_date
+        description: Date of the player's latest game, played or DNP.
+
+  # --- Facts -------------------------------------------------------------------
+
   - name: fct_team_game
-    description: One row per team per completed game, with possessions, ratings, pace, result and rest days.
+    description: One row per team per completed game, with possessions, ratings, pace, result and rest days. Each game has two rows, one per side.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -34,7 +68,10 @@ models:
           arguments:
             expression: "possessions * 48 / (48 + 5 * overtime_periods) between 70 and 130"
     columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
       - name: team_id
+        description: "{{ doc('team_id') }}"
         data_tests:
           - not_null
           - relationships:
@@ -42,19 +79,84 @@ models:
                 to: ref('dim_team')
                 field: team_id
       - name: opponent_team_id
+        description: "{{ doc('opponent_team_id') }}"
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_team')
                 field: team_id
-      - name: possessions
-        data_tests: [not_null]
+      - name: game_date
+        description: "{{ doc('game_date') }}"
+      - name: season
+        description: "{{ doc('season') }}"
+      - name: season_type
+        description: ESPN season type. 1 = preseason, 2 = regular season, 3 = postseason.
+      - name: is_regular_season
+        description: "{{ doc('is_regular_season') }}"
+      - name: overtime_periods
+        description: Number of overtime periods played (0 for a regulation game).
+      - name: team_abbr
+        description: "{{ doc('team_abbr') }}"
+      - name: opponent_abbr
+        description: Opponent's abbreviation.
+      - name: is_home
+        description: "{{ doc('is_home') }}"
+      - name: pts
+        description: Points scored.
+      - name: opp_pts
+        description: Points allowed.
       - name: won
+        description: "{{ doc('won') }}"
         data_tests: [not_null]
+      - name: fgm
+        description: Field goals made.
+      - name: fga
+        description: Field goals attempted.
+      - name: fg3m
+        description: Three-pointers made.
+      - name: fg3a
+        description: Three-pointers attempted.
+      - name: ftm
+        description: Free throws made.
+      - name: fta
+        description: Free throws attempted.
+      - name: oreb
+        description: Offensive rebounds.
+      - name: dreb
+        description: Defensive rebounds.
+      - name: reb
+        description: Total rebounds.
+      - name: ast
+        description: Assists.
+      - name: stl
+        description: Steals.
+      - name: blk
+        description: Blocks.
+      - name: tov
+        description: Turnovers.
+      - name: pf
+        description: Personal fouls.
+      - name: possessions
+        description: "{{ doc('possessions') }}"
+        data_tests: [not_null]
+      - name: opp_possessions
+        description: The opponent's possessions, same formula.
+      - name: off_rtg
+        description: "{{ doc('off_rtg') }}"
+      - name: def_rtg
+        description: "{{ doc('def_rtg') }}"
+      - name: net_rtg
+        description: "{{ doc('net_rtg') }}"
+      - name: pace
+        description: "{{ doc('pace') }}"
+      - name: rest_days
+        description: "{{ doc('rest_days') }}"
+      - name: is_back_to_back
+        description: "{{ doc('is_back_to_back') }}"
 
   - name: fct_player_game
-    description: One row per player per completed game, DNP rows included, with true shooting % and game score.
+    description: One row per player per completed game, DNP rows included, with true shooting % and game score. Box score columns are null for DNP rows.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
@@ -65,9 +167,13 @@ models:
           config:
             where: "not did_not_play"
     columns:
+      - name: game_id
+        description: "{{ doc('game_id') }}"
       - name: player_id
+        description: "{{ doc('player_id') }}"
         data_tests: [not_null]
       - name: team_id
+        description: The player's team in this game.
         data_tests:
           - not_null
           - relationships:
@@ -75,52 +181,136 @@ models:
                 to: ref('dim_team')
                 field: team_id
       - name: opponent_team_id
+        description: "{{ doc('opponent_team_id') }}"
         data_tests:
           - not_null
           - relationships:
               arguments:
                 to: ref('dim_team')
                 field: team_id
+      - name: game_date
+        description: "{{ doc('game_date') }}"
+      - name: season
+        description: "{{ doc('season') }}"
+      - name: is_regular_season
+        description: "{{ doc('is_regular_season') }}"
+      - name: is_home
+        description: "{{ doc('is_home') }}"
+      - name: won
+        description: "{{ doc('won') }}"
+      - name: is_back_to_back
+        description: True when the player's team also played the day before.
+      - name: player_name
+        description: Player's display name in this game.
+      - name: position
+        description: Position abbreviation in this game.
+      - name: starter
+        description: True if the player started.
       - name: did_not_play
+        description: True if the player was listed but did not play (DNP).
         data_tests: [not_null]
+      - name: ejected
+        description: True if the player was ejected.
+      - name: minutes
+        description: Minutes played.
+      - name: pts
+        description: Points.
+      - name: fgm
+        description: Field goals made.
+      - name: fga
+        description: Field goals attempted.
+      - name: fg3m
+        description: Three-pointers made.
+      - name: fg3a
+        description: Three-pointers attempted.
+      - name: ftm
+        description: Free throws made.
+      - name: fta
+        description: Free throws attempted.
+      - name: reb
+        description: Total rebounds.
+      - name: oreb
+        description: Offensive rebounds.
+      - name: dreb
+        description: Defensive rebounds.
+      - name: ast
+        description: Assists.
+      - name: tov
+        description: Turnovers.
+      - name: stl
+        description: Steals.
+      - name: blk
+        description: Blocks.
+      - name: pf
+        description: Personal fouls.
+      - name: plus_minus
+        description: Team points minus opponent points while the player was on the court.
       - name: ts_pct
+        description: "{{ doc('ts_pct') }}"
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 max_value: 1.5
+      - name: game_score
+        description: "{{ doc('game_score') }}"
 
-  - name: dim_player
-    description: One row per player, with the latest name, position and team from their most recent game.
-    columns:
-      - name: player_id
-        data_tests: [unique, not_null]
-      - name: player_name
-        data_tests: [not_null]
-      - name: current_team_id
-        data_tests:
-          - relationships:
-              arguments:
-                to: ref('dim_team')
-                field: team_id
+  # --- Marts (built for dashboards) ----------------------------------------------
 
   - name: mart_daily_leaders
-    description: Top 10 players by game score for each game date.
+    description: Top 10 players by game score for each game date, DNP rows excluded. Ties share a rank, so a date can have more than 10 rows.
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [game_date, player_id]
     columns:
+      - name: game_date
+        description: "{{ doc('game_date') }}"
       - name: daily_rank
+        description: Rank by game score among all players on that date, best = 1.
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 1
                 max_value: 10
+      - name: game_id
+        description: "{{ doc('game_id') }}"
+      - name: player_id
+        description: "{{ doc('player_id') }}"
+      - name: player_name
+        description: Player's display name in this game.
+      - name: team_abbr
+        description: The player's team.
+      - name: opponent_abbr
+        description: The opponent.
+      - name: conference
+        description: Conference of the player's team.
+      - name: is_home
+        description: "{{ doc('is_home') }}"
+      - name: won
+        description: "{{ doc('won') }}"
+      - name: is_regular_season
+        description: "{{ doc('is_regular_season') }}"
+      - name: minutes
+        description: Minutes played.
+      - name: pts
+        description: Points.
+      - name: reb
+        description: Total rebounds.
+      - name: ast
+        description: Assists.
+      - name: stl
+        description: Steals.
+      - name: blk
+        description: Blocks.
+      - name: ts_pct
+        description: "{{ doc('ts_pct') }}"
+      - name: game_score
+        description: "{{ doc('game_score') }}"
 
   - name: mart_team_form
-    description: One row per team, regular-season record and form over its last 10 games, as of the latest game.
+    description: One row per team, regular-season record and form over its last 10 games, as of the latest game. For the standings on earlier dates use mart_standings_history.
     data_tests:
       - dbt_utils.equal_rowcount:
           arguments:
@@ -133,6 +323,7 @@ models:
             expression: "last10_wins + last10_losses = last10_games"
     columns:
       - name: team_id
+        description: "{{ doc('team_id') }}"
         data_tests:
           - unique
           - not_null
@@ -140,19 +331,48 @@ models:
               arguments:
                 to: ref('dim_team')
                 field: team_id
+      - name: team_abbr
+        description: "{{ doc('team_abbr') }}"
+      - name: team_name
+        description: Full team name.
+      - name: conference
+        description: "{{ doc('conference') }}"
+      - name: division
+        description: "{{ doc('division') }}"
+      - name: games
+        description: Regular-season games played.
+      - name: wins
+        description: Regular-season wins.
+      - name: losses
+        description: Regular-season losses.
       - name: win_pct
+        description: "{{ doc('win_pct') }}"
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 max_value: 1
+      - name: season_net_rtg
+        description: "{{ doc('net_rtg_avg') }} Over all regular-season games."
       - name: last10_games
+        description: "Games counted in the last-10 window. {{ doc('last10') }}"
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 1
                 max_value: 10
+      - name: last10_wins
+        description: "Wins in the last-10 window. {{ doc('last10') }}"
+      - name: last10_losses
+        description: "Losses in the last-10 window. {{ doc('last10') }}"
+      - name: last10_net_rtg
+        description: "{{ doc('net_rtg_avg') }} Over the last-10 window."
+      - name: form_trend
+        description: last10_net_rtg minus season_net_rtg. Positive = playing better lately than over the season.
+      - name: last_game_date
+        description: Date of the team's latest regular-season game.
       - name: conference_rank
+        description: "{{ doc('conference_rank') }}"
         data_tests:
           - not_null
           - dbt_utils.accepted_range:
@@ -160,6 +380,90 @@ models:
                 min_value: 1
                 max_value: 15
 
+  - name: mart_standings_history
+    description: >
+      Regular-season standings after each game date: one row per team per date
+      on which any regular-season game was played. A team that did not play
+      that night carries its previous record. Use it for standings and
+      net-rating trend charts; the latest date equals mart_team_form.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [season, as_of_date, team_id]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "wins + losses = games"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "last10_wins + last10_losses = last10_games"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "games_behind >= 0"
+    columns:
+      - name: season
+        description: "{{ doc('season') }}"
+        data_tests: [not_null]
+      - name: as_of_date
+        description: The standings after this date's games. Only dates with at least one regular-season game appear.
+        data_tests: [not_null]
+      - name: team_id
+        description: "{{ doc('team_id') }}"
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_team')
+                field: team_id
+      - name: team_abbr
+        description: "{{ doc('team_abbr') }}"
+      - name: team_name
+        description: Full team name.
+      - name: conference
+        description: "{{ doc('conference') }}"
+      - name: division
+        description: "{{ doc('division') }}"
+      - name: played_on_date
+        description: True if the team played on as_of_date.
+      - name: games
+        description: Regular-season games played up to and including as_of_date.
+      - name: wins
+        description: Wins up to and including as_of_date.
+      - name: losses
+        description: Losses up to and including as_of_date.
+      - name: win_pct
+        description: "{{ doc('win_pct') }} Null before the team's first game."
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+      - name: net_rtg
+        description: "{{ doc('net_rtg_avg') }} Over the season up to as_of_date."
+      - name: last10_games
+        description: "Games in the last-10 window as of that date. {{ doc('last10') }}"
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 10
+      - name: last10_wins
+        description: Wins in the last-10 window as of that date.
+      - name: last10_losses
+        description: Losses in the last-10 window as of that date.
+      - name: conference_rank
+        description: "{{ doc('conference_rank') }} Teams without a game yet rank last."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 15
+      - name: games_behind
+        description: >
+          Games behind the conference team with the best wins minus losses:
+          ((best W - L) - (W - L)) / 2. Never negative. Early in the season it
+          can differ from published standings, which measure from the team
+          with the best win percentage.
 
   - name: mart_player_consistency
     description: One row per player with 10 or more regular-season games played, with scoring averages, spread and season true shooting. current_team_abbr is the team of the player's latest game, so a traded player's whole season is listed under his current team.
@@ -172,6 +476,7 @@ models:
             expression: "stddev_pts >= 0"
     columns:
       - name: player_id
+        description: "{{ doc('player_id') }}"
         data_tests:
           - unique
           - not_null
@@ -179,15 +484,34 @@ models:
               arguments:
                 to: ref('dim_player')
                 field: player_id
+      - name: player_name
+        description: Player's display name from their latest game.
+      - name: position
+        description: Position from their latest game.
       - name: current_team_abbr
+        description: Team of the player's latest game; the whole season is listed under it.
         data_tests: [not_null]
+      - name: games_played
+        description: Regular-season games played (DNPs not counted).
+      - name: avg_minutes
+        description: Average minutes per game played.
+      - name: avg_pts
+        description: Average points per game played.
+      - name: stddev_pts
+        description: Standard deviation of points per game.
+      - name: pts_cv
+        description: Coefficient of variation of points, stddev_pts / avg_pts. Lower = more consistent scorer.
+      - name: avg_game_score
+        description: "Average game score. {{ doc('game_score') }}"
+      - name: stddev_game_score
+        description: Standard deviation of game score.
       - name: season_ts_pct
+        description: "True shooting % over the season's totals (not an average of games). {{ doc('ts_pct') }}"
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 max_value: 1.5
-
 
   - name: mart_home_away
     description: One row per team, regular-season home and away record and net rating, and the difference between them.
@@ -203,6 +527,7 @@ models:
             expression: "home_wins <= home_games and away_wins <= away_games"
     columns:
       - name: team_id
+        description: "{{ doc('team_id') }}"
         data_tests:
           - unique
           - not_null
@@ -210,18 +535,46 @@ models:
               arguments:
                 to: ref('dim_team')
                 field: team_id
+      - name: team_abbr
+        description: "{{ doc('team_abbr') }}"
+      - name: team_name
+        description: Full team name.
+      - name: conference
+        description: "{{ doc('conference') }}"
+      - name: games
+        description: Regular-season games played.
+      - name: home_games
+        description: Home games played.
+      - name: home_wins
+        description: Home wins.
+      - name: home_losses
+        description: Home losses.
       - name: home_win_pct
+        description: Home wins / home games, 3 decimals. Null with no home games.
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 max_value: 1
+      - name: home_net_rtg
+        description: "{{ doc('net_rtg_avg') }} Home games only."
+      - name: away_games
+        description: Away games played.
+      - name: away_wins
+        description: Away wins.
+      - name: away_losses
+        description: Away losses.
       - name: away_win_pct
+        description: Away wins / away games, 3 decimals. Null with no away games.
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 max_value: 1
+      - name: away_net_rtg
+        description: "{{ doc('net_rtg_avg') }} Away games only."
+      - name: home_court_edge
+        description: home_net_rtg minus away_net_rtg. Positive = the team is better at home.
 
   - name: mart_back_to_back_impact
     description: One row per team, regular-season performance on the second night of back-to-backs compared with rested games.
@@ -237,6 +590,7 @@ models:
             expression: "b2b_wins <= b2b_games and rested_wins <= rested_games"
     columns:
       - name: team_id
+        description: "{{ doc('team_id') }}"
         data_tests:
           - unique
           - not_null
@@ -244,14 +598,44 @@ models:
               arguments:
                 to: ref('dim_team')
                 field: team_id
-      - name: rested_games
-        data_tests:
-          - dbt_utils.accepted_range:
-              arguments:
-                min_value: 1
+      - name: team_abbr
+        description: "{{ doc('team_abbr') }}"
+      - name: team_name
+        description: Full team name.
+      - name: conference
+        description: "{{ doc('conference') }}"
+      - name: games
+        description: Regular-season games played.
+      - name: b2b_games
+        description: Games on the second night of a back-to-back (played the day before too).
+      - name: b2b_wins
+        description: Wins in those games.
+      - name: b2b_win_pct
+        description: b2b_wins / b2b_games, 3 decimals. Null with no back-to-backs yet.
+      - name: b2b_net_rtg
+        description: "{{ doc('net_rtg_avg') }} Back-to-back games only."
       - name: b2b_fg_pct
+        description: Field goal % over back-to-back games (total FGM / total FGA).
         data_tests:
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 0
                 max_value: 1
+      - name: rested_games
+        description: All other games (at least one day off, or the season opener).
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+      - name: rested_wins
+        description: Wins in rested games.
+      - name: rested_win_pct
+        description: rested_wins / rested_games, 3 decimals.
+      - name: rested_net_rtg
+        description: "{{ doc('net_rtg_avg') }} Rested games only."
+      - name: rested_fg_pct
+        description: Field goal % over rested games (total FGM / total FGA).
+      - name: b2b_net_rtg_diff
+        description: b2b_net_rtg minus rested_net_rtg. Negative = the team is worse on the second night.
+      - name: b2b_fg_pct_diff
+        description: b2b_fg_pct minus rested_fg_pct.

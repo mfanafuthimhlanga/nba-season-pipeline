@@ -1,0 +1,17 @@
+version: 2
+
+seeds:
+  - name: team_conferences
+    description: >
+      Conference and division for each of the 30 teams, keyed on ESPN's team
+      abbreviation. ESPN's game feeds do not carry them. Edit the CSV when the
+      league realigns or a team changes its abbreviation; dim_team's row-count
+      test fails if a team is missing.
+    columns:
+      - name: team_abbr
+        description: Team abbreviation as ESPN shows it, e.g. BOS.
+        data_tests: [unique, not_null]
+      - name: conference
+        description: East or West.
+      - name: division
+        description: NBA division.

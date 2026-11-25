@@ -49,3 +49,18 @@ models:
         data_tests: [not_null]
       - name: did_not_play
         data_tests: [not_null]
+
+  - name: stg_schedule_dates
+    description: >
+      One row per date ESPN's season calendar lists as a game day, preseason
+      included, read from the most recently ingested scoreboard. The schedule
+      that tests/assert_scheduled_dates_loaded.sql checks silver against.
+    columns:
+      - name: game_date
+        description: US Eastern game day with at least one scheduled game.
+        data_tests:
+          - unique
+          - not_null
+          # An empty calendar (ESPN changed the payload) would make the
+          # schedule test pass trivially; fail instead.
+          - dbt_utils.at_least_one
