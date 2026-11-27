@@ -2,7 +2,8 @@ with played as (
     select *
     from {{ ref('fct_player_game') }}
     where is_regular_season
-      and not did_not_play
+        and season = {{ current_season(ref('fct_player_game')) }}
+        and not did_not_play
 ),
 
 player_totals as (
