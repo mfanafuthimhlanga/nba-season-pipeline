@@ -26,7 +26,8 @@ date, so any step can be rerun safely.
                       03_build_silver, backfill
     src/setup/        00_setup.sql: catalog, schemas, volume, silver tables
     dbt/nba/          dbt project for the gold layer
-    deploy/           nba_daily.job.json (the job, exported) and export_job.py
+    deploy/           nba_daily.job.json (the job, exported), export_job.py,
+                      heartbeat.sql (the "did not run" alert's query)
     tests/            unit tests for the parts that run without Spark
     docs/runbook.md   what to do when a run fails; rerunning a date; new season
     docs/issues.md    known issues and how each was resolved
@@ -53,6 +54,8 @@ night's games in the US are over:
 1. Run `src/setup/00_setup.sql` in the workspace.
 2. Create the `nba_daily` job from `deploy/nba_daily.job.json` (fill in the
    SQL warehouse and notification e-mail), with Git source = this repository.
+   Save `deploy/heartbeat.sql` as a query and give it the alert described in
+   its header.
 3. Load the season so far: run `src/jobs/backfill.py` with a two-day window
    first to check the output, then the full range. Then run `dbt build` once.
 
@@ -98,9 +101,11 @@ Every `dbt build` (the job's last task) checks the data as well as building it:
 The job e-mails on failure. [docs/runbook.md](docs/runbook.md) lists each
 failure and what to do.
 
-The schedule check cannot tell you the job did not run at all (a paused
-schedule, a workspace outage): then nothing runs and nothing e-mails. The
-job's last run is in the Databricks UI, or `databricks jobs list-runs`.
+A job that does not run at all (a paused schedule) fails no task, so the job
+cannot report it. A Databricks SQL alert outside the job, `nba_daily did not
+run`, checks at 12:00 UTC that bronze gained a row in the last 12 hours and
+e-mails if not ([deploy/heartbeat.sql](deploy/heartbeat.sql)). A workspace-wide
+outage would silence that alert too.
 
 ## Using the data
 

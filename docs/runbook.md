@@ -18,6 +18,19 @@ has no cached credentials, sign in again:
 
     databricks auth login --host https://<workspace>.cloud.databricks.com --profile DEFAULT
 
+## When the "did not run" alert fires
+
+The e-mail `nba_daily did not run` means bronze gained no row in the last 12
+hours: the job did not run this morning, or ran and failed before `load_bronze`
+wrote its row (that run sends its own failure e-mail too).
+
+1. Open the job. If the schedule is paused, resume it.
+2. If no run started, look for a stuck or queued run and cancel it.
+3. Run the job by hand (blank `game_date` loads yesterday). For more than one
+   missed day, rerun each date (below).
+
+The alert e-mails again when it is back to OK, after its next check.
+
 ## When a run fails
 
 Find the failed task in the run, then use the matching row.
