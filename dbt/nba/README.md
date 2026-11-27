@@ -35,8 +35,9 @@ definitions (net rating, true shooting %, game score, ...) are in
 | `mart_player_consistency` | player with 10+ games | scoring average and spread |
 
 The marts count regular-season games only. The season-level marts (team form,
-home/away, back-to-back, consistency) do not yet filter by season (issue #29 in
-`docs/issues.md`); `mart_standings_history` and the facts carry `season`.
+home/away, back-to-back, consistency) count the current season, the highest
+regular-season `season` (`macros/current_season.sql`); `mart_standings_history`
+and the facts keep every season.
 
 ## Singular tests
 
@@ -82,11 +83,14 @@ nba:
       catalog: nba
       schema: gold
       threads: 1
+    prod:
+      # the same connection settings as dev
 ```
 
 The token is a secret: keep it in `~/.dbt`, never in this repository.
 
-There is one target, and schemas are used as named (`macros/generate_schema_name.sql`),
-so **a `dbt build` from the laptop writes the production schemas** (issue #31). To
-try a change on real data, build a copy of the project whose `generate_schema_name`
-adds a prefix, then drop the prefixed schemas; see `docs/runbook.md`.
+`macros/generate_schema_name.sql` prefixes `dev_` for the `dev` target only, so
+a plain `dbt build` from the laptop writes `nba.dev_staging`, `nba.dev_intermediate`
+and `nba.dev_gold` and never production. Every other target, including the job's
+and `--target prod`, uses the schemas as named; type `--target prod` only for a
+deliberate production build.

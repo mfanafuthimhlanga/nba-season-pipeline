@@ -310,7 +310,7 @@ models:
         description: "{{ doc('game_score') }}"
 
   - name: mart_team_form
-    description: One row per team, regular-season record and form over its last 10 games, as of the latest game. For the standings on earlier dates use mart_standings_history.
+    description: One row per team, current-season regular-season record and form over its last 10 games, as of the latest game. For the standings on earlier dates use mart_standings_history.
     data_tests:
       - dbt_utils.equal_rowcount:
           arguments:
@@ -466,7 +466,7 @@ models:
           with the best win percentage.
 
   - name: mart_player_consistency
-    description: One row per player with 10 or more regular-season games played, with scoring averages, spread and season true shooting. current_team_abbr is the team of the player's latest game, so a traded player's whole season is listed under his current team.
+    description: One row per player with 10 or more current-season regular-season games played, with scoring averages, spread and season true shooting. current_team_abbr is the team of the player's latest game, so a traded player's whole season is listed under his current team.
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:
@@ -514,7 +514,7 @@ models:
                 max_value: 1.5
 
   - name: mart_home_away
-    description: One row per team, regular-season home and away record and net rating, and the difference between them.
+    description: One row per team, current-season regular-season home and away record and net rating, and the difference between them.
     data_tests:
       - dbt_utils.equal_rowcount:
           arguments:
@@ -577,7 +577,7 @@ models:
         description: home_net_rtg minus away_net_rtg. Positive = the team is better at home.
 
   - name: mart_back_to_back_impact
-    description: One row per team, regular-season performance on the second night of back-to-backs compared with rested games.
+    description: One row per team, current-season regular-season performance on the second night of back-to-backs compared with rested games.
     data_tests:
       - dbt_utils.equal_rowcount:
           arguments:
