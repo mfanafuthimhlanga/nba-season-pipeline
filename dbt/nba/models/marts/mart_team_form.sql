@@ -6,7 +6,7 @@ with games as (
         net_rtg,
         row_number() over (partition by team_id order by game_date desc) as recency
     from {{ ref('fct_team_game') }}
-    where is_regular_season
+    where is_regular_season and season = {{ current_season(ref('fct_team_game')) }}
 ),
 
 team_totals as (

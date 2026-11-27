@@ -1,7 +1,7 @@
 with games as (
     select *
     from {{ ref('fct_team_game') }}
-    where is_regular_season
+    where is_regular_season and season = {{ current_season(ref('fct_team_game')) }}
 ),
 
 splits as (
